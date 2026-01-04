@@ -1,3 +1,5 @@
+extern crate core;
+
 use std::io;
 use std::net::TcpListener;
 
@@ -12,7 +14,7 @@ fn main() -> io::Result<()>{
     for maybe_stream in listener.incoming() {
         match maybe_stream {
             Ok(mut stream) => {
-                match connection::handle_connection(&mut stream, &routing) {
+                match connection::handle_connection(stream, &routing) {
                     Ok(_) => (),
                     Err(e) => eprintln!("Couldn't handle connection {e}"),
                 }

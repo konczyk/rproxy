@@ -28,7 +28,7 @@ pub struct Request<'a> {
 }
 
 impl<'a> Request<'a> {
-    pub fn new(buf: &'a mut [u8]) -> Option<Request<'a>> {
+    pub fn new(buf: &'a [u8]) -> Option<Request<'a>> {
         let mut lines = buf.split(|x| *x == b'\n').map(|x| x.trim_ascii_end());
 
         if let Some((method, path)) = lines.next().and_then(|line| {
