@@ -1,11 +1,11 @@
 use crate::forward;
 use crate::http;
+use crate::http::StatusCode::{BadRequest, NotFound};
 use crate::routing::Routing;
 use std::io::Write;
 use std::net::TcpStream;
 use std::sync::Arc;
 use std::{io, thread};
-use crate::http::StatusCode::{BadGateway, BadRequest};
 
 pub fn handle_connection(mut stream: TcpStream, routing: Arc<Routing>) -> io::Result<()> {
 
@@ -25,7 +25,7 @@ pub fn handle_connection(mut stream: TcpStream, routing: Arc<Routing>) -> io::Re
         })?;
 
         let addr = routing.select_upstream(&request).ok_or_else(|| {
-            match stream.write_all(BadGateway.as_bytes()) {
+            match stream.write_all(NotFound.as_bytes()) {
                 Ok(_) => io::Error::new(io::ErrorKind::InvalidData, "Routing Error"),
                 Err(e) => io::Error::new(io::ErrorKind::InvalidData, format!("Write Error: {e}")),
             }

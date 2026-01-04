@@ -93,23 +93,26 @@ impl<'a> Request<'a> {
     }
 
     pub fn parse_headers(stream: &mut TcpStream) -> Result<(Vec<u8>, usize), HeadersParseError> {
+        stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).map_err(|_| HeadersParseError::Invalid)?;
+
         let mut buf = [0u8; 512];
         let mut headers = Vec::with_capacity(2048);
 
         loop {
-            if let Ok(bytes) = stream.read(&mut buf) {
-                headers.extend_from_slice(&buf[..bytes]);
-                if headers.len() >= 64 * 1024 {
-                    return Err(HeadersParseError::TooLarge);
-                }
-                match headers.windows(4).enumerate().find(|(_, val)| val == b"\r\n\r\n") {
-                    Some((i, _)) => {
-                        return Ok((headers, i));
-                    },
-                    _ => continue
-                }
-            } else {
-                return Err(HeadersParseError::Invalid);
+            match stream.read(&mut buf) {
+                Ok(bytes) if bytes > 0 => {
+                    headers.extend_from_slice(&buf[..bytes]);
+                    if headers.len() >= 64 * 1024 {
+                        return Err(HeadersParseError::TooLarge);
+                    }
+                    match headers.windows(4).enumerate().find(|(_, val)| val == b"\r\n\r\n") {
+                        Some((i, _)) => {
+                            return Ok((headers, i + 4));
+                        },
+                        _ => ()
+                    }
+                },
+                _ => return Err(HeadersParseError::Invalid)
             }
         }
     }
