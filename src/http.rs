@@ -6,8 +6,8 @@ pub(crate) struct Request<'a> {
     headers: HashMap::<&'a [u8], &'a [u8]>,
 }
 
-impl Request<'_> {
-    pub fn new(buf: &mut [u8]) -> Option<Request> {
+impl<'a> Request<'a> {
+    pub fn new(buf: &'a mut [u8]) -> Option<Request<'a>> {
         let mut lines = buf.split(|x| *x == b'\n').map(|x| x.trim_ascii_end());
 
         if let Some((method, path)) = lines.next().and_then(|line| {
@@ -20,7 +20,7 @@ impl Request<'_> {
         }) {
             let mut headers = HashMap::<&[u8], &[u8]>::new();
             lines.skip_while(|x| x.is_empty()).take_while(|x| !x.is_empty()).for_each(|line| {
-                let h = line.split(|x| *x == b':').map(|x| x.trim_ascii()).collect::<Vec<&[u8]>>();
+                let h = line.splitn(2, |x| *x == b':').map(|x| x.trim_ascii()).collect::<Vec<&[u8]>>();
                 if h.len() == 2 {
                     headers.insert(h[0], h[1]);
                 } else {
