@@ -32,20 +32,23 @@ impl<'a> Request<'a> {
         let mut lines = buf.split(|x| *x == b'\n').map(|x| x.trim_ascii_end());
 
         if let Some((method, path)) = lines.next().and_then(|line| {
-            let req = line.split(|x| *x == b' ').collect::<Vec<&[u8]>>();
-            if req.len() < 2 {
-                None
-            } else {
-                Some((req[0], req[1]))
-            }
+            let mut req = line.split(|x| *x == b' ').into_iter();
+            let method = req.next();
+            let path = req.next();
+            method.and_then(|m| path.map(|p| (m, p)))
         }) {
             let mut headers = HashMap::new();
             lines.skip_while(|x| x.is_empty()).take_while(|x| !x.is_empty()).for_each(|line| {
-                let h = line.splitn(2, |x| *x == b':').map(|x| x.trim_ascii()).collect::<Vec<&[u8]>>();
-                if h.len() == 2 {
-                    headers.insert(HeaderKey(h[0]), h[1]);
-                } else {
-                    eprintln!("Failed parsing header: {:?}", h);
+                let mut h = line.splitn(2, |x| *x == b':').map(|x| x.trim_ascii()).into_iter();
+                let header = h.next();
+                let value = h.next();
+                match header.and_then(|h| value.map(|v| (h, v))) {
+                    Some((h, v)) => {
+                        headers.insert(HeaderKey(h), v);
+                    },
+                    None => {
+                        eprintln!("Failed parsing header: {:?}", line)
+                    },
                 }
             });
 
