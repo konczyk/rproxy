@@ -1,9 +1,10 @@
+use crate::forward;
 use crate::http;
 use crate::routing::Routing;
-use crate::forward;
-use std::{io, thread};
 use std::io::{Read, Write};
+use std::net::Shutdown::Both;
 use std::net::TcpStream;
+use std::{io, thread};
 
 pub fn handle_connection(mut stream: TcpStream, routing: &Routing) -> io::Result<()> {
     let mut hbuf = [0u8; 512];
@@ -47,6 +48,7 @@ pub fn handle_connection(mut stream: TcpStream, routing: &Routing) -> io::Result
             let mut buf = [0u8; 8192];
             loop {
                 match forward::forward(&mut buf, &mut c_stream, &mut c_upstream) {
+                    Ok(0) => break,
                     Ok(_) => (),
                     Err(e) => {
                         eprintln!("Error writing to upstream {e}");
@@ -63,6 +65,7 @@ pub fn handle_connection(mut stream: TcpStream, routing: &Routing) -> io::Result
             let mut buf = [0u8; 8192];
             loop {
                 match forward::forward(&mut buf, &mut u_upstream, &mut u_stream) {
+                    Ok(0) => break,
                     Ok(_) => (),
                     Err(e) => {
                         eprintln!("Error reading from upstream {e}");
