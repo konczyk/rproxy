@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-pub(crate) struct Request<'a> {
-    method: &'a [u8],
-    path: &'a [u8],
-    headers: HashMap::<&'a [u8], &'a [u8]>,
+#[derive(Debug)]
+pub struct Request<'a> {
+    pub method: &'a [u8],
+    pub path: &'a [u8],
+    pub headers: HashMap::<&'a [u8], &'a [u8]>,
 }
 
 impl<'a> Request<'a> {

@@ -1,17 +1,20 @@
+use crate::http;
+use crate::routing::Routing;
+use crate::forward;
 use std::io;
 use std::io::{Read, Write};
-use crate::forward;
-use crate::http;
 use std::net::TcpStream;
 
-pub fn handle_connection(stream: &mut TcpStream) -> io::Result<()> {
+pub fn handle_connection(stream: &mut TcpStream, routing: &Routing) -> io::Result<()> {
     let mut head = [0u8; 8192];
     let mut buf = [0u8; 8192];
-    
-    if let Ok(bytes) = stream.read(&mut head) {
-        let _request = http::Request::new(&mut head).expect("Expected Request");
 
-        if let Ok(mut upstream) = TcpStream::connect("192.168.124.185:80") {
+    if let Ok(bytes) = stream.read(&mut head) {
+
+        let request = http::Request::new(&mut head).expect("Expected Request");
+        let addr = routing.select_upstream(&request).expect(format!("Route not found {:?}", request).as_str());
+
+        if let Ok(mut upstream) = TcpStream::connect(&addr) {
 
             upstream.write_all(&mut head)?;
             if bytes < head.len() {
@@ -28,6 +31,8 @@ pub fn handle_connection(stream: &mut TcpStream) -> io::Result<()> {
                     }
                 }
             }
+        } else {
+            eprintln!("Failed to connect to {addr}");
         }
     }
     Ok(())
