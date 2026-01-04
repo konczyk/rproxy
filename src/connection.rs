@@ -1,9 +1,16 @@
+use std::io;
+use std::io::Read;
 use crate::forward;
+use crate::http;
 use std::net::TcpStream;
 
-pub fn handle_connection(stream: &mut TcpStream) {
+pub fn handle_connection(stream: &mut TcpStream) -> io::Result<()> {
+    let mut buf = [0u8; 8192];
+    stream.read(&mut buf)?;
+
+    let _request = http::Request::new(&mut buf).expect("Expected Request");
+
     if let Ok(mut upstream) = TcpStream::connect("192.168.124.185:80") {
-        let mut buf = [0u8; 8192];
 
         loop {
             match forward::forward(&mut buf, stream, &mut upstream)
@@ -16,4 +23,5 @@ pub fn handle_connection(stream: &mut TcpStream) {
             }
         }
     }
+    Ok(())
 }
