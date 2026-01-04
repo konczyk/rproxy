@@ -2,11 +2,11 @@ use crate::forward;
 use crate::http;
 use crate::routing::Routing;
 use std::io::{Read, Write};
-use std::net::Shutdown::Both;
 use std::net::TcpStream;
+use std::sync::Arc;
 use std::{io, thread};
 
-pub fn handle_connection(mut stream: TcpStream, routing: &Routing) -> io::Result<()> {
+pub fn handle_connection(mut stream: TcpStream, routing: Arc<Routing>) -> io::Result<()> {
     let mut hbuf = [0u8; 512];
     let mut head = Vec::with_capacity(8192);
 
