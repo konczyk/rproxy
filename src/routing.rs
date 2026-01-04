@@ -1,4 +1,4 @@
-use crate::http::Request;
+use crate::http::{HeaderKey, Request};
 
 struct Route {
     host: String,
@@ -20,7 +20,7 @@ impl Routing {
     }
     pub fn select_upstream(&self, request: &Request) -> Option<String> {
         self.routes.iter().find(|r| {
-            request.headers.get(b"Host".as_slice()).map(|h| *h == r.host.as_bytes()).unwrap_or(false) &&
+            request.headers.get(&HeaderKey("host".as_bytes())).map(|h| *h == r.host.as_bytes()).unwrap_or(false) &&
                 r.path.to_lowercase().as_bytes().starts_with(request.path)
         }).map(|r| r.addr.clone())
     }
