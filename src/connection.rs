@@ -35,7 +35,10 @@ pub fn handle_connection(mut stream: TcpStream, routing: Arc<Routing>) -> io::Re
             return Err(io::Error::new(io::ErrorKind::Other, "Error reading HTTP header"));
         }
 
-        let request = http::Request::new(&head[..end]).expect("Expected Request");
+        let request = match http::Request::new(&head[..end]) {
+            Some(r) => r,
+            None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid request"))
+        };
         let addr = routing.select_upstream(&request).expect(format!("Route not found {:?}", request).as_str());
 
         let mut upstream = TcpStream::connect(&addr)?;
