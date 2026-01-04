@@ -1,5 +1,39 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::io::Read;
+use std::net::TcpStream;
+
+pub enum HeadersParseError {
+    TooLarge,
+    Invalid
+}
+
+impl HeadersParseError {
+    pub fn to_status_code(&self) -> StatusCode {
+        match self {
+            HeadersParseError::TooLarge => StatusCode::HeadersTooLarge,
+            HeadersParseError::Invalid => StatusCode::BadRequest
+        }
+    }
+}
+
+pub enum StatusCode {
+    BadRequest,
+    NotFound,
+    HeadersTooLarge,
+    BadGateway,
+}
+
+impl StatusCode {
+    pub fn as_bytes(&self) -> &'static [u8] {
+        match self {
+            Self::BadRequest => b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            Self::NotFound => b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            Self::HeadersTooLarge => b"HTTP/1.1 431 Request Header Fields Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            Self::BadGateway => b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct HeaderKey<'a>(pub &'a [u8]);
@@ -56,5 +90,27 @@ impl<'a> Request<'a> {
         }
 
         None
+    }
+
+    pub fn parse_headers(stream: &mut TcpStream) -> Result<(Vec<u8>, usize), HeadersParseError> {
+        let mut buf = [0u8; 512];
+        let mut headers = Vec::with_capacity(2048);
+
+        loop {
+            if let Ok(bytes) = stream.read(&mut buf) {
+                headers.extend_from_slice(&buf[..bytes]);
+                if headers.len() >= 64 * 1024 {
+                    return Err(HeadersParseError::TooLarge);
+                }
+                match headers.windows(4).enumerate().find(|(_, val)| val == b"\r\n\r\n") {
+                    Some((i, _)) => {
+                        return Ok((headers, i));
+                    },
+                    _ => continue
+                }
+            } else {
+                return Err(HeadersParseError::Invalid);
+            }
+        }
     }
 }

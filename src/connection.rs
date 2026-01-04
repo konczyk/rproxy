@@ -1,48 +1,38 @@
 use crate::forward;
 use crate::http;
 use crate::routing::Routing;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::net::TcpStream;
 use std::sync::Arc;
 use std::{io, thread};
+use crate::http::StatusCode::{BadGateway, BadRequest};
 
 pub fn handle_connection(mut stream: TcpStream, routing: Arc<Routing>) -> io::Result<()> {
-    let mut hbuf = [0u8; 512];
-    let mut head = Vec::with_capacity(8192);
 
     loop {
-        let mut end = head.len();
-        if let Ok(bytes) = stream.read(&mut hbuf) {
-            head.extend_from_slice(&hbuf[..bytes]);
-            if head.len() >= 64*1024 {
-                return Err(io::Error::new(io::ErrorKind::Other, "Headers too large"));
+        let (headers, end) = http::Request::parse_headers(&mut stream).map_err(|e| {
+            match stream.write_all(e.to_status_code().as_bytes()) {
+                Ok(_) => io::Error::new(io::ErrorKind::InvalidData, "Protocol Error"),
+                Err(e) => io::Error::new(io::ErrorKind::InvalidData, format!("Write Error: {e}")),
             }
-            let (first, last) = head.split_at(head.len() - 1024.min(head.len()));
-            for (i, ch) in last.iter().enumerate() {
-                if *ch == b'\r' && last.len() >= i + 4 {
-                    if &last[i..=i+3] == b"\r\n\r\n" {
-                        end = first.len() + i + 4;
-                        break;
-                    }
+        })?;
 
-                }
+        let request = http::Request::new(&headers[..end]).ok_or_else(|| {
+            match stream.write_all(BadRequest.as_bytes()) {
+                Ok(_) => io::Error::new(io::ErrorKind::InvalidData, "Request Error"),
+                Err(e) => io::Error::new(io::ErrorKind::InvalidData, format!("Write Error: {e}")),
             }
-        } else {
-            return Err(io::Error::new(io::ErrorKind::Other, "Connection reset"));
-        }
+        })?;
 
-        if end == 0 {
-            return Err(io::Error::new(io::ErrorKind::Other, "Error reading HTTP header"));
-        }
-
-        let request = match http::Request::new(&head[..end]) {
-            Some(r) => r,
-            None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid request"))
-        };
-        let addr = routing.select_upstream(&request).expect(format!("Route not found {:?}", request).as_str());
+        let addr = routing.select_upstream(&request).ok_or_else(|| {
+            match stream.write_all(BadGateway.as_bytes()) {
+                Ok(_) => io::Error::new(io::ErrorKind::InvalidData, "Routing Error"),
+                Err(e) => io::Error::new(io::ErrorKind::InvalidData, format!("Write Error: {e}")),
+            }
+        })?;
 
         let mut upstream = TcpStream::connect(&addr)?;
-        upstream.write_all(&head)?;
+        upstream.write_all(&headers)?;
 
         let mut c_stream = stream.try_clone().expect("Stream cloning failed");
         let mut c_upstream = upstream.try_clone().expect("Stream cloning failed");
