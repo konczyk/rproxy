@@ -7,8 +7,7 @@ use rproxy::{connection, routing};
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_400_on_missing_headers_delimiter() {
+    fn connect() -> TcpStream {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap();
 
@@ -19,7 +18,21 @@ mod tests {
             let _ = connection::handle_connection(stream, routing);
         });
 
-        let mut client = TcpStream::connect(addr).unwrap();
+        let mut delay = std::time::Duration::from_millis(10);
+        for _ in 0..5 {
+            if let Ok(stream) = TcpStream::connect(addr) {
+                return stream
+            }
+            thread::sleep(delay);
+            delay *= 2; // Exponential backoff
+        }
+
+        TcpStream::connect(addr).unwrap()
+    }
+
+    #[test]
+    fn test_400_on_missing_headers_delimiter() {
+        let mut client = connect();
         client.write_all(b"GET /buba HTTP/1.1\r\nHost: localhost:8080\r\n").unwrap();
         client.shutdown(std::net::Shutdown::Write).unwrap();
 
@@ -31,17 +44,7 @@ mod tests {
 
     #[test]
     fn test_404_on_missing_route() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-
-        let routing = Arc::new(routing::Routing::new());
-
-        thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
-            let _ = connection::handle_connection(stream, routing);
-        });
-
-        let mut client = TcpStream::connect(addr).unwrap();
+        let mut client = connect();
         client.write_all(b"GET /buba HTTP/1.1\r\nHost: localhost:8080\r\n\r\n").unwrap();
         client.shutdown(std::net::Shutdown::Write).unwrap();
 
@@ -52,18 +55,8 @@ mod tests {
     }
 
     #[test]
-    fn test_400_on_malformed_headers() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-
-        let routing = Arc::new(routing::Routing::new());
-
-        thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
-            let _ = connection::handle_connection(stream, routing);
-        });
-
-        let mut client = TcpStream::connect(addr).unwrap();
+    fn test_400_on_malformed_request_line() {
+        let mut client = connect();
         client.write_all(b"xxx\r\n\r\n").unwrap();
         client.shutdown(std::net::Shutdown::Write).unwrap();
 
