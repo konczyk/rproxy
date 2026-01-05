@@ -1,8 +1,8 @@
 use crate::http::{HeaderKey, Request};
 
 struct Route {
-    host: String,
-    path: String,
+    host: Vec<u8>,
+    path: Vec<u8>,
     addr: String,
 }
 
@@ -14,15 +14,15 @@ impl Routing {
     pub fn new() -> Routing {
         Routing {
             routes: vec![
-                Route { host: "localhost:8080".to_string(), path: "/pl".to_string(), addr: "192.168.124.185:80".to_string() }
+                Route { host: "localhost:8080".as_bytes().to_vec(), path: "/pl".as_bytes().to_vec(), addr: "192.168.124.185:80".to_string() }
             ]
         }
     }
-    pub fn select_upstream(&self, request: &Request) -> Option<String> {
+    pub fn select_upstream(&self, request: &Request) -> Option<&str> {
         self.routes.iter().find(|r| {
-            request.headers.get(&HeaderKey("host".as_bytes())).map(|h| *h == r.host.as_bytes()).unwrap_or(false) &&
-                r.path.to_lowercase().as_bytes().starts_with(request.path)
-        }).map(|r| r.addr.clone())
+            request.headers.get(&HeaderKey("host".as_bytes())).map(|h| *h == r.host).unwrap_or(false) &&
+                request.path.starts_with(&r.path)
+        }).map(|r| r.addr.as_str())
     }
 
 }

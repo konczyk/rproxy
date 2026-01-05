@@ -31,7 +31,7 @@ pub fn handle_connection(mut stream: TcpStream, routing: Arc<Routing>) -> io::Re
             }
         })?;
 
-        let mut upstream = TcpStream::connect(&addr)?;
+        let mut upstream = TcpStream::connect(addr)?;
         upstream.write_all(&headers)?;
 
         let mut c_stream = stream.try_clone().expect("Stream cloning failed");
