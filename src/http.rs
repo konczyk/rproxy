@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::io::Read;
-use std::net::TcpStream;
+use tokio::io::AsyncReadExt;
+use tokio::net::TcpStream;
 
+#[derive(Debug)]
 pub enum HeadersParseError {
     TooLarge,
     Invalid
@@ -92,14 +93,12 @@ impl<'a> Request<'a> {
         None
     }
 
-    pub fn parse_headers(stream: &mut TcpStream) -> Result<(Vec<u8>, usize), HeadersParseError> {
-        stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).map_err(|_| HeadersParseError::Invalid)?;
-
+    pub async fn parse_headers(stream: &mut TcpStream) -> Result<(Vec<u8>, usize), HeadersParseError> {
         let mut buf = [0u8; 512];
         let mut headers = Vec::with_capacity(2048);
 
         loop {
-            match stream.read(&mut buf) {
+            match stream.read(&mut buf).await {
                 Ok(bytes) if bytes > 0 => {
                     headers.extend_from_slice(&buf[..bytes]);
                     if headers.len() >= 64 * 1024 {
