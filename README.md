@@ -14,6 +14,12 @@ bidirectional TCP streaming.
 - HTTP/1.1 request parsing
 - Zero-copy bidirectional tunneling
 - Optional debug logging (`--debug`)
+ 
+## Testing 
+
+```bash
+cargo test 
+```
 
 ## Running
 

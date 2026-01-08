@@ -9,7 +9,7 @@ use tokio::net::TcpListener;
 #[derive(Parser)]
 struct Args {
 
-    /// display debugging information
+    /// Run in a debug mode
     #[arg(short, long)]
     debug: bool,
 }
