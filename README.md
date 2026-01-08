@@ -15,6 +15,7 @@ bidirectional TCP streaming.
 - Routing by `Host` header + path prefix
 - Per-route upstream timeouts
 - Protection against stalled or unresponsive backends
+- Graceful shutdown with active connection tracking
 - HTTP/1.1 request header parsing
 - Zero-copy bidirectional tunneling
 - Optional debug logging (`--debug`)
