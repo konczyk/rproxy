@@ -4,9 +4,11 @@ use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 
 mod tests {
+    use std::time::Duration;
     use super::*;
     use rproxy::config::Config;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::time::sleep;
 
     async fn connect(routes: Vec<Route>) -> TcpStream {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -63,6 +65,55 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_502_on_invalid_gateway() {
+        let routes = vec![Route {
+            host: "localhost:54322".as_bytes().to_vec(),
+            path: "/target".as_bytes().to_vec(),
+            addr: "localhost:54321".to_string(),
+            timeout: None
+        }];
+        let mut client = connect(routes).await;
+        client.write_all(b"GET /target HTTP/1.1\r\nHost: localhost:54322\r\n\r\n").await.unwrap();
+        client.shutdown().await.unwrap();
+
+        let mut response = String::new();
+        client.read_to_string(&mut response).await.unwrap();
+        assert!(response.contains("502 Bad Gateway"));
+    }
+
+    #[tokio::test]
+    async fn test_504_on_upstream_timeout() {
+        let backend_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let backend_addr = backend_listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            sleep(Duration::from_millis(1000)).await;
+            if let Ok((mut stream, _)) = backend_listener.accept().await {
+                let mut buf = [0u8; 1024];
+                let _ = stream.read(&mut buf).await;
+                let response = b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello";
+                let _ = stream.write_all(response).await;
+            }
+        });
+
+        let routes = vec![Route {
+            host: "localhost:8080".as_bytes().to_vec(),
+            path: "/target".as_bytes().to_vec(),
+            addr: backend_addr.to_string(),
+            timeout: Some(100)
+        }];
+        let mut client = connect(routes).await;
+
+        client.write_all(b"GET /target HTTP/1.1\r\nHost: localhost:8080\r\n\r\n").await.unwrap();
+        client.shutdown().await.unwrap();
+
+        let mut response = String::new();
+        client.read_to_string(&mut response).await.unwrap();
+
+        assert!(response.contains("504 Gateway Timeout"));
+    }
+
+    #[tokio::test]
     async fn test_successful_proxy_to_backend() {
         let backend_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let backend_addr = backend_listener.local_addr().unwrap();
@@ -79,7 +130,8 @@ mod tests {
         let routes = vec![Route {
             host: "localhost:8080".as_bytes().to_vec(),
             path: "/target".as_bytes().to_vec(),
-            addr: backend_addr.to_string()
+            addr: backend_addr.to_string(),
+            timeout: None
         }];
         let mut client = connect(routes).await;
 
@@ -91,6 +143,5 @@ mod tests {
 
         assert!(response.contains("200 OK"));
         assert!(response.contains("Hello"));
-
     }
 }

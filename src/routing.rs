@@ -5,6 +5,7 @@ pub struct RouteConfig {
     pub host: String,
     pub path: String,
     pub addr: String,
+    pub timeout: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -13,6 +14,7 @@ pub struct Route {
     pub host: Vec<u8>,
     pub path: Vec<u8>,
     pub addr: String,
+    pub timeout: Option<u64>,
 }
 
 impl From<RouteConfig> for Route {
@@ -20,7 +22,8 @@ impl From<RouteConfig> for Route {
         Self {
             host: value.host.as_bytes().to_vec(),
             path: value.path.as_bytes().to_vec(),
-            addr: value.addr
+            addr: value.addr,
+            timeout: value.timeout,
         }
     }
 }

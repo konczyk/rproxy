@@ -23,6 +23,7 @@ pub enum StatusCode {
     NotFound,
     HeadersTooLarge,
     BadGateway,
+    GatewayTimeout,
 }
 
 impl StatusCode {
@@ -32,6 +33,7 @@ impl StatusCode {
             Self::NotFound => b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
             Self::HeadersTooLarge => b"HTTP/1.1 431 Request Header Fields Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
             Self::BadGateway => b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            Self::GatewayTimeout => b"HTTP/1.1 504 Gateway Timeout\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         }
     }
 }
