@@ -1,0 +1,4 @@
+[[routes]]
+host = "localhost:12345"
+path = "/"
+addr = "localhost:12346"

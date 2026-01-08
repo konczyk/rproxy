@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tokio::io::{copy_bidirectional, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-pub async fn handle_connection(mut stream: TcpStream, routing: Arc<Config>) -> io::Result<()> {
+pub async fn handle_connection(mut stream: TcpStream, config: Arc<Config>) -> io::Result<()> {
 
     let (headers, end) = match http::Request::parse_headers(&mut stream).await {
         Ok(val) => Ok(val),
@@ -26,7 +26,7 @@ pub async fn handle_connection(mut stream: TcpStream, routing: Arc<Config>) -> i
             }),
     }?;
 
-    let addr = match routing.select_upstream(&request) {
+    let addr = match config.select_upstream(&request) {
         Some(a) => Ok(a),
         None => Err(
             match stream.write_all(NotFound.as_bytes()).await {

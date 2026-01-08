@@ -8,15 +8,18 @@ mod tests {
     use rproxy::config::Config;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    async fn connect(routing: Option<Config>) -> TcpStream {
+    async fn connect(routes: Vec<Route>) -> TcpStream {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
+        let c = "tests/config.toml".to_string();
 
-        let routing = Arc::new(routing.unwrap_or(Config::new(vec![])));
+        let mut c = Config::new(&c).unwrap();
+        c.add_routes(routes);
+        let config = Arc::new(c);
 
         tokio::spawn(async move {
             if let Ok((stream, _)) = listener.accept().await {
-                let _ = connection::handle_connection(stream, routing).await;
+                let _ = connection::handle_connection(stream, config).await;
             }
         });
 
@@ -25,7 +28,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_400_on_missing_headers_delimiter() {
-        let mut client = connect(None).await;
+        let mut client = connect(vec![]).await;
         client.write_all(b"GET /buba HTTP/1.1\r\nHost: localhost:8080\r\n").await.unwrap();
         client.shutdown().await.unwrap();
 
@@ -37,7 +40,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_404_on_missing_route() {
-        let mut client = connect(None).await;
+        let mut client = connect(vec![]).await;
         client.write_all(b"GET /buba HTTP/1.1\r\nHost: localhost:8080\r\n\r\n").await.unwrap();
         client.shutdown().await.unwrap();
 
@@ -49,7 +52,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_400_on_malformed_request_line() {
-        let mut client = connect(None).await;
+        let mut client = connect(vec![]).await;
         client.write_all(b"xxx\r\n\r\n").await.unwrap();
         client.shutdown().await.unwrap();
 
@@ -73,10 +76,13 @@ mod tests {
             }
         });
 
-        let routes = vec![
-            Route { host: "localhost:8080".as_bytes().to_vec(), path: "/target".as_bytes().to_vec(), addr: backend_addr.to_string() }
-        ];
-        let mut client = connect(Some(Config::new(routes))).await;
+        let routes = vec![Route {
+            host: "localhost:8080".as_bytes().to_vec(),
+            path: "/target".as_bytes().to_vec(),
+            addr: backend_addr.to_string()
+        }];
+        let mut client = connect(routes).await;
+
         client.write_all(b"GET /target HTTP/1.1\r\nHost: localhost:8080\r\n\r\n").await.unwrap();
         client.shutdown().await.unwrap();
 
