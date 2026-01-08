@@ -1,9 +1,8 @@
 use clap::Parser;
-use rproxy::connection;
-use rproxy::routing;
 use rproxy::routing::Route;
-use std::sync::Arc;
+use rproxy::{config, connection};
 use std::io;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 
 #[derive(Parser)]
@@ -24,7 +23,7 @@ async fn main() -> io::Result<()>{
         path: "/pl".as_bytes().to_vec(),
         addr: "192.168.124.185:80".to_string()
     }];
-    let routing = Arc::from(routing::Routing::new(routes));
+    let routing = Arc::from(config::Config::new(routes));
 
     loop {
         let (stream, _) = listener.accept().await?;

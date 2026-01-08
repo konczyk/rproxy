@@ -1,25 +1,26 @@
-use crate::http::{HeaderKey, Request};
+use serde::Deserialize;
 
+#[derive(Deserialize)]
+pub struct RouteConfig {
+    pub host: String,
+    pub path: String,
+    pub addr: String,
+}
+
+#[derive(Deserialize)]
+#[serde(from="RouteConfig")]
 pub struct Route {
     pub host: Vec<u8>,
     pub path: Vec<u8>,
     pub addr: String,
 }
 
-pub struct Routing {
-    routes: Vec<Route>
-}
-
-impl Routing {
-    pub fn new(routes: Vec<Route>) -> Routing {
-        Routing { routes }
+impl From<RouteConfig> for Route {
+    fn from(value: RouteConfig) -> Self {
+        Self {
+            host: value.host.as_bytes().to_vec(),
+            path: value.path.as_bytes().to_vec(),
+            addr: value.addr
+        }
     }
-
-    pub fn select_upstream(&self, request: &Request) -> Option<&str> {
-        self.routes.iter().find(|r| {
-            request.headers.get(&HeaderKey("host".as_bytes())).map(|h| *h == r.host).unwrap_or(false) &&
-                request.path.starts_with(&r.path)
-        }).map(|r| r.addr.as_str())
-    }
-
 }

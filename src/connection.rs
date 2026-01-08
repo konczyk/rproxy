@@ -1,12 +1,12 @@
+use crate::config::Config;
 use crate::http;
 use crate::http::StatusCode::{BadRequest, NotFound};
-use crate::routing::Routing;
-use std::sync::Arc;
 use std::io;
+use std::sync::Arc;
 use tokio::io::{copy_bidirectional, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-pub async fn handle_connection(mut stream: TcpStream, routing: Arc<Routing>) -> io::Result<()> {
+pub async fn handle_connection(mut stream: TcpStream, routing: Arc<Config>) -> io::Result<()> {
 
     let (headers, end) = match http::Request::parse_headers(&mut stream).await {
         Ok(val) => Ok(val),

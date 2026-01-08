@@ -1,18 +1,18 @@
 use rproxy::connection;
 use rproxy::routing::Route;
-use rproxy::routing::Routing;
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 
 mod tests {
     use super::*;
+    use rproxy::config::Config;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    async fn connect(routing: Option<Routing>) -> TcpStream {
+    async fn connect(routing: Option<Config>) -> TcpStream {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
 
-        let routing = Arc::new(routing.unwrap_or(Routing::new(vec![])));
+        let routing = Arc::new(routing.unwrap_or(Config::new(vec![])));
 
         tokio::spawn(async move {
             if let Ok((stream, _)) = listener.accept().await {
@@ -76,7 +76,7 @@ mod tests {
         let routes = vec![
             Route { host: "localhost:8080".as_bytes().to_vec(), path: "/target".as_bytes().to_vec(), addr: backend_addr.to_string() }
         ];
-        let mut client = connect(Some(Routing::new(routes))).await;
+        let mut client = connect(Some(Config::new(routes))).await;
         client.write_all(b"GET /target HTTP/1.1\r\nHost: localhost:8080\r\n\r\n").await.unwrap();
         client.shutdown().await.unwrap();
 
