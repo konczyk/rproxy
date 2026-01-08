@@ -10,7 +10,6 @@ bidirectional TCP streaming.
 ## Features
 
 - Async, non-blocking I/O (Tokio)
-- Static routing by `Host` + path prefix
 - Dynamic routing via configuration file (default: `config.toml`)
 - Supports **TOML** and **YAML** (`.yaml` / `.yml`) configs - examples in `data` directory
 - Routing by `Host` header + path prefix
