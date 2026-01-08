@@ -19,10 +19,10 @@ struct Args {
 #[tokio::main]
 async fn main() -> io::Result<()>{
     let args = Arc::from(Args::parse());
-    let listener = TcpListener::bind("localhost:8080").await?;
+    let config = config::Config::new(&args.config)?;
+    let listener = TcpListener::bind(&config.listen).await?;
 
-    let parsed = config::Config::new(&args.config)?;
-    let config = Arc::new(parsed);
+    let config = Arc::new(config);
 
     loop {
         let (stream, _) = listener.accept().await?;

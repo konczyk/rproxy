@@ -3,12 +3,13 @@ use crate::routing::Route;
 use serde::Deserialize;
 use std::fs::read_to_string;
 use std::io;
-use std::io::ErrorKind::InvalidData;
 use std::io::Error;
+use std::io::ErrorKind::InvalidData;
 use std::path::Path;
 
 #[derive(Deserialize)]
 pub struct Config {
+    pub listen: String,
     routes: Vec<Route>
 }
 
