@@ -1,9 +1,10 @@
 use clap::Parser;
 use rproxy::{config, connection};
-use std::io;
 use std::sync::Arc;
+use std::{env, io};
 use tokio::net::TcpListener;
 use tokio_util::task::TaskTracker;
+use tracing::{error, info, warn};
 
 #[derive(Parser)]
 struct Args {
@@ -19,10 +20,14 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> io::Result<()>{
-    let args = Arc::from(Args::parse());
-    let config = config::Config::new(&args.config)?;
+    let args = Args::parse();
+    let config = Arc::new(config::Config::new(&args.config)?);
     let listener = TcpListener::bind(&config.listen).await?;
-    let config = Arc::new(config);
+    let filter = env::var("RUST_LOG").unwrap_or_else(|_| (if args.debug { "debug" } else { "info" }).to_string());
+
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .init();
 
     let tracker = TaskTracker::new();
 
@@ -32,38 +37,25 @@ async fn main() -> io::Result<()>{
                 match accepted {
                     Ok((stream, _)) => {
                         let c = Arc::clone(&config);
-                        let a = Arc::clone(&args);
                         tracker.spawn(async move {
-                            if let Err(e) = connection::handle_connection(stream, c).await {
-                                if a.debug {
-                                    eprintln!("An error occurred: {}", e);
-                                }
-                            }
+                            let _ = connection::handle_connection(stream, c).await;
                         });
                     },
-                    Err(e) => if args.debug {
-                        eprintln!("Accept error: {}", e);
-                    },
+                    Err(e) => error!("Accept error: {}", e)
                 }
             },
             _ = tokio::signal::ctrl_c() => {
-                if args.debug {
-                    eprintln!("\nShutdown signal received...");
-                }
+                warn!("\nShutdown signal received...");
                 break
             }
         }
     }
 
     tracker.close();
-    if args.debug {
-        eprintln!("Waiting for active connections to finish...");
-    }
+    info!("Waiting for active connections to finish...");
 
     tracker.wait().await;
-    if args.debug {
-        eprintln!("Shutdown complete!");
-    }
+    info!("Shutdown complete!");
 
     Ok(())
 }

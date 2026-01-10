@@ -1,11 +1,15 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use thiserror::Error;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
+use tracing::{debug, error, warn};
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum HeadersParseError {
+    #[error("Header Fields Too Large")]
     TooLarge,
+    #[error("Bad Request")]
     Invalid
 }
 
@@ -84,7 +88,7 @@ impl<'a> Request<'a> {
                         headers.insert(HeaderKey(h), v);
                     },
                     None => {
-                        eprintln!("Failed parsing header: {:?}", line)
+                        warn!("Failed parsing header: {:?}", line)
                     },
                 }
             });
@@ -98,12 +102,18 @@ impl<'a> Request<'a> {
     pub async fn parse_headers(stream: &mut TcpStream) -> Result<(Vec<u8>, usize), HeadersParseError> {
         let mut buf = [0u8; 512];
         let mut headers = Vec::with_capacity(2048);
+        debug!("Parsing request headers...");
 
         loop {
             match stream.read(&mut buf).await {
-                Ok(bytes) if bytes > 0 => {
+                Ok(bytes) => {
+                    if bytes == 0 {
+                        warn!("Reading headers returned 0 bytes");
+                        return Err(HeadersParseError::Invalid)
+                    }
                     headers.extend_from_slice(&buf[..bytes]);
                     if headers.len() >= 64 * 1024 {
+                        warn!("Requested headers too large: {}", headers.len());
                         return Err(HeadersParseError::TooLarge);
                     }
                     match headers.windows(4).enumerate().find(|(_, val)| val == b"\r\n\r\n") {
@@ -113,7 +123,10 @@ impl<'a> Request<'a> {
                         _ => ()
                     }
                 },
-                _ => return Err(HeadersParseError::Invalid)
+                Err(e) => {
+                    error!("Failed to read headers: {}", e);
+                    return Err(HeadersParseError::Invalid)
+                }
             }
         }
     }
