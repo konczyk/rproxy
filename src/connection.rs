@@ -1,14 +1,14 @@
 use crate::config::Config;
 use crate::http;
 use crate::http::StatusCode;
-use crate::http::StatusCode::{BadGateway, BadRequest, GatewayTimeout, NotFound};
+use crate::http::StatusCode::{BadGateway, BadRequest, GatewayTimeout, NotFound, RequestTimeout};
 use io::ErrorKind;
 use std::io;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{copy_bidirectional, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tracing::{error, info, instrument};
+use tracing::{error, info, instrument, warn};
 
 async fn handle_error(stream: &mut TcpStream, status_code: StatusCode, e: impl Into<String>) -> io::Error {
     if let Err(e) = stream.write_all(status_code.as_bytes()).await {
@@ -33,9 +33,13 @@ pub async fn handle_connection(mut stream: TcpStream, config: Arc<Config>) -> io
 
     info!("Processing new request");
 
-    let (headers, end) = match http::Request::parse_headers(&mut stream).await {
-        Ok(val) => Ok(val),
-        Err(e) => Err(handle_error(&mut stream, e.to_status_code(), e.to_string()).await),
+    let (headers, end) = match tokio::time::timeout(Duration::from_secs(5), http::Request::parse_headers(&mut stream)).await {
+        Ok(Ok(val)) => Ok(val),
+        Ok(Err(e)) => Err(handle_error(&mut stream, e.to_status_code(), e.to_string()).await),
+        Err(e) => {
+            warn!("Client header timeout: {}", e);
+            Err(handle_error(&mut stream, RequestTimeout, e.to_string()).await)
+        },
     }?;
 
     let request = match http::Request::new(&headers[..end]) {
