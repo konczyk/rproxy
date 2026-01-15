@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::http;
-use crate::http::StatusCode;
-use crate::http::StatusCode::{BadGateway, BadRequest, Forbidden, GatewayTimeout, NotFound, RequestTimeout};
+use crate::http::StatusCode::{BadGateway, BadRequest, Forbidden, GatewayTimeout, NotFound, RequestTimeout, Unauthorized};
+use crate::http::{HeaderKey, StatusCode};
 use io::ErrorKind;
 use std::io;
 use std::sync::Arc;
@@ -36,7 +36,7 @@ pub async fn handle_connection(mut stream: TcpStream, config: Arc<Config>) -> io
     match stream.peer_addr() {
         Ok(socket_addr) => {
             let ip = socket_addr.ip();
-            if !config.permit(ip) {
+            if !config.permit_addr(ip) {
                 warn!("Access denied for peer {}", ip);
                 Err(handle_error(&mut stream, Forbidden, "Access denied").await)
             } else {
@@ -59,12 +59,22 @@ pub async fn handle_connection(mut stream: TcpStream, config: Arc<Config>) -> io
 
     let request = match http::Request::new(&headers[..end]) {
         Some(req) => Ok(req),
-        None => Err(handle_error(&mut stream, BadRequest, "Unspecified error").await),
+        None => Err(handle_error(&mut stream, BadRequest, "Parsing headers failed").await),
+    }?;
+
+    let auth_result = request.headers.get(&HeaderKey(b"authorization")).map(|auth| config.permit_user(auth));
+    let api_result = request.headers.get(&HeaderKey(b"x-api-key")).map(|key| config.permit_api_key(key));
+
+    let _ = match (auth_result, api_result) {
+        (Some(false), _) => Err(handle_error(&mut stream, Unauthorized(true), "Invalid Basic Authentication").await),
+        (_, Some(false)) => Err(handle_error(&mut stream, Unauthorized(false), "Invalid API Key").await),
+        (None, None) if config.is_proxy_private() => Err(handle_error(&mut stream, Unauthorized(false), "No authorization method used").await),
+        _ => Ok(())
     }?;
 
     let route = match config.select_upstream(&request) {
         Some(a) => Ok(a),
-        None => Err(handle_error(&mut stream, NotFound, "Unspecified Error").await),
+        None => Err(handle_error(&mut stream, NotFound, "Failed to select upstream server").await),
     }?;
 
     let timeout = Duration::from_millis(route.timeout.unwrap_or(10_000));

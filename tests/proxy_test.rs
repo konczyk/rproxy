@@ -4,11 +4,11 @@ use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 
 mod tests {
+    use super::*;
+    use rproxy::config::{AccessControl, Config};
     use std::collections::HashSet;
     use std::net::IpAddr;
     use std::str::FromStr;
-    use super::*;
-    use rproxy::config::{AccessControl, Config};
     use std::time::Duration;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::time::sleep;
@@ -20,9 +20,7 @@ mod tests {
 
         let mut c = Config::new(&c).unwrap();
         c.add_routes(routes);
-        if let Some(a) = access {
-            c.access = a;
-        }
+        c.access = access;
         let config = Arc::new(c);
 
         tokio::spawn(async move {
@@ -74,6 +72,7 @@ mod tests {
     async fn test_403_on_non_whitelisted_ip() {
         let access = AccessControl {
             whitelist: Some(HashSet::from([IpAddr::from_str("1.1.1.1").unwrap()])),
+            auth: None,
         };
         let mut client = connect(vec![], Some(access)).await;
         client.write_all(b"GET / HTTP/1.1\r\nHost: localhost:8080\r\n\r\n").await.unwrap();

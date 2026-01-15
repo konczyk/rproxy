@@ -24,6 +24,7 @@ impl HeadersParseError {
 
 pub enum StatusCode {
     BadRequest,
+    Unauthorized(bool),
     Forbidden,
     NotFound,
     RequestTimeout,
@@ -36,6 +37,11 @@ impl StatusCode {
     pub fn as_bytes(&self) -> &'static [u8] {
         match self {
             Self::BadRequest => b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            Self::Unauthorized(is_basic_auth) => if *is_basic_auth {
+                b"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"Proxy\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            } else {
+                b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            },
             Self::Forbidden => b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
             Self::NotFound => b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
             Self::RequestTimeout => b"HTTP/1.1 408 Request Timeout\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
@@ -101,6 +107,10 @@ impl<'a> Request<'a> {
         }
 
         None
+    }
+
+    pub fn get_header(&self, header: &str) -> Option<&[u8]> {
+        self.headers.get(&HeaderKey(header.as_bytes())).map(|h| h.iter().as_slice())
     }
 
     pub async fn parse_headers(stream: &mut TcpStream) -> Result<(Vec<u8>, usize), HeadersParseError> {
