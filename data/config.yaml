@@ -9,20 +9,20 @@ routes:
     timeout: 5000 # optional timeout in ms
 
 # Access control settings for strict security
-access:
-  # IP Whitelist: Only these IPs can connect
-  whitelist:
-    - "127.0.0.1"
-    - "192.168.1.50"
+# access:
+   # IP Whitelist: Only these IPs can connect
+#  whitelist:
+#    - "127.0.0.1"
+#    - "192.168.1.50"
 
-  auth:
+#  auth:
     # Basic Authentication users
-    users:
-      admin: "password123"
-      developer: "rust_is_cool"
-      security_audit: "strictest_password_ever"
+#    users:
+#      admin: "password123"
+#      developer: "rust_is_cool"
+#      security_audit: "strictest_password_ever"
 
     # API Keys for header-based auth (X-API-Key)
-    api_keys:
-      - "secret-agent-key-007"
-      - "internal-service-token"
+#    api_keys:
+#      - "secret-agent-key-007"
+#      - "internal-service-token"

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{copy_bidirectional, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tracing::{error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 async fn handle_error(stream: &mut TcpStream, status_code: StatusCode, e: impl Into<String>) -> io::Error {
     if let Err(e) = stream.write_all(status_code.as_bytes()).await {
@@ -16,7 +16,9 @@ async fn handle_error(stream: &mut TcpStream, status_code: StatusCode, e: impl I
         return e;
     }
 
-    io::Error::new(ErrorKind::InvalidData, e.into())
+    let err = e.into();
+    debug!("{}", err);
+    io::Error::new(ErrorKind::InvalidData, err)
 }
 
 #[instrument(

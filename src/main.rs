@@ -45,7 +45,7 @@ async fn main() -> io::Result<()>{
                 }
             },
             _ = tokio::signal::ctrl_c() => {
-                warn!("\nShutdown signal received...");
+                warn!("Shutdown signal received...");
                 break
             }
         }

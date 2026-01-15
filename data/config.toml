@@ -9,15 +9,15 @@ addr = "192.168.124.185:80"
 timeout = 5000 # optional timeout in ms
 
 # Access control settings for strict security
-# [access]
+[access]
 # IP Whitelist: Only these IPs can connect
 # whitelist = ["127.0.0.1", "192.168.1.50"]
 
-# [access.auth]
+[access.auth]
 # Basic Authentication users
 # [access.auth.users]
 # admin = "password123"
 # developer = "rust_is_cool"
 
 # API Keys for header-based auth (X-API-Key)
-# api_keys = ["secret-agent-key-007", "internal-service-token"]
+api_keys = ["secret-agent-key-007", "internal-service-token"]
