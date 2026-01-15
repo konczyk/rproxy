@@ -4,3 +4,5 @@ routes:
     path: "/pl"
     addr: "192.168.124.185:80"
     timeout: 5000 # optional timeout in ms
+access:
+#  whitelist: ["::1"]

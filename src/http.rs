@@ -24,6 +24,7 @@ impl HeadersParseError {
 
 pub enum StatusCode {
     BadRequest,
+    Forbidden,
     NotFound,
     RequestTimeout,
     HeadersTooLarge,
@@ -35,6 +36,7 @@ impl StatusCode {
     pub fn as_bytes(&self) -> &'static [u8] {
         match self {
             Self::BadRequest => b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            Self::Forbidden => b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
             Self::NotFound => b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
             Self::RequestTimeout => b"HTTP/1.1 408 Request Timeout\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
             Self::HeadersTooLarge => b"HTTP/1.1 431 Request Header Fields Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
@@ -104,7 +106,7 @@ impl<'a> Request<'a> {
     pub async fn parse_headers(stream: &mut TcpStream) -> Result<(Vec<u8>, usize), HeadersParseError> {
         let mut buf = [0u8; 512];
         let mut headers = Vec::with_capacity(2048);
-        debug!("Parsing request headers...");
+        debug!("Parsing request headers");
 
         loop {
             match stream.read(&mut buf).await {

@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::http;
 use crate::http::StatusCode;
-use crate::http::StatusCode::{BadGateway, BadRequest, GatewayTimeout, NotFound, RequestTimeout};
+use crate::http::StatusCode::{BadGateway, BadRequest, Forbidden, GatewayTimeout, NotFound, RequestTimeout};
 use io::ErrorKind;
 use std::io;
 use std::sync::Arc;
@@ -32,6 +32,21 @@ pub async fn handle_connection(mut stream: TcpStream, config: Arc<Config>) -> io
     tracing::Span::current().record("request_id", &request_id);
 
     info!("Processing new request");
+
+    match stream.peer_addr() {
+        Ok(socket_addr) => {
+            let ip = socket_addr.ip();
+            if !config.permit(ip) {
+                warn!("Access denied for peer {}", ip);
+                Err(handle_error(&mut stream, Forbidden, "Access denied").await)
+            } else {
+                Ok(())
+            }
+        },
+        Err(e) => {
+            Err(handle_error(&mut stream, BadRequest, e.to_string()).await)
+        }
+    }?;
 
     let (headers, end) = match tokio::time::timeout(Duration::from_secs(5), http::Request::parse_headers(&mut stream)).await {
         Ok(Ok(val)) => Ok(val),

@@ -1,16 +1,25 @@
 use crate::http::{HeaderKey, Request};
 use crate::routing::Route;
 use serde::Deserialize;
+use std::collections::HashSet;
 use std::fs::read_to_string;
 use std::io;
 use std::io::Error;
 use std::io::ErrorKind::InvalidData;
+use std::net::IpAddr;
 use std::path::Path;
+
+#[derive(Deserialize)]
+pub struct AccessControl {
+    #[serde(default)]
+    pub whitelist: Option<HashSet<IpAddr>>
+}
 
 #[derive(Deserialize)]
 pub struct Config {
     pub listen: String,
-    routes: Vec<Route>
+    routes: Vec<Route>,
+    pub access: AccessControl
 }
 
 impl Config {
@@ -30,6 +39,10 @@ impl Config {
 
     pub fn add_routes(&mut self, routes: Vec<Route>) {
         self.routes.extend(routes);
+    }
+
+    pub fn permit(&self, peer_addr: IpAddr) -> bool {
+        self.access.whitelist.as_ref().map_or(true, |ips| ips.contains(&peer_addr))
     }
 
     pub fn select_upstream(&self, request: &Request) -> Option<&Route> {
