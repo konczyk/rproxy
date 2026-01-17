@@ -14,6 +14,7 @@ mod tests {
     use base64::Engine;
     use base64::prelude::BASE64_STANDARD;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::sync::RwLock;
     use tokio::time::sleep;
 
     async fn connect(routes: Vec<Route>, access: Option<AccessControl>) -> TcpStream {
@@ -53,6 +54,7 @@ mod tests {
             host: "localhost:8080".as_bytes().to_vec(),
             path: "/target".as_bytes().to_vec(),
             backends: vec![backend_addr.to_string()],
+            active_backends: Arc::new(RwLock::new(vec![backend_addr.to_string()])),
             timeout: None,
             counter: AtomicUsize::new(0)
         }];
@@ -86,6 +88,7 @@ mod tests {
             host: "localhost:8080".as_bytes().to_vec(),
             path: "/target".as_bytes().to_vec(),
             backends: vec![backend_addr.to_string()],
+            active_backends: Arc::new(RwLock::new(vec![backend_addr.to_string()])),
             timeout: None,
             counter: AtomicUsize::new(0)
         }];
@@ -127,6 +130,7 @@ mod tests {
             host: "localhost:8080".as_bytes().to_vec(),
             path: "/target".as_bytes().to_vec(),
             backends: vec![backend_addr.to_string()],
+            active_backends: Arc::new(RwLock::new(vec![backend_addr.to_string()])),
             timeout: None,
             counter: AtomicUsize::new(0)
         }];
@@ -252,6 +256,7 @@ mod tests {
             host: "localhost:54322".as_bytes().to_vec(),
             path: "/target".as_bytes().to_vec(),
             backends: vec!["localhost:54321".to_string()],
+            active_backends: Arc::new(RwLock::new(vec!["localhost:54321".to_string()])),
             timeout: None,
             counter: AtomicUsize::new(0)
         }];
@@ -283,6 +288,7 @@ mod tests {
             host: "localhost:8080".as_bytes().to_vec(),
             path: "/target".as_bytes().to_vec(),
             backends: vec![backend_addr.to_string()],
+            active_backends: Arc::new(RwLock::new(vec![backend_addr.to_string()])),
             timeout: Some(100),
             counter: AtomicUsize::new(0)
         }];
