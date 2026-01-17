@@ -81,7 +81,7 @@ pub async fn handle_connection(mut stream: TcpStream, config: Arc<Config>) -> io
 
     let timeout = Duration::from_millis(route.timeout.unwrap_or(10_000));
 
-    let backend = match route.next_addr() {
+    let backend = match route.next_addr().await {
         Some(b) => b,
         None => return Err(handle_error(&mut stream, BadGateway, "Failed to fetch next backend").await),
     };

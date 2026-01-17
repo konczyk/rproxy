@@ -31,7 +31,7 @@ pub struct AccessControl {
 #[derive(Deserialize)]
 pub struct Config {
     pub listen: String,
-    routes: Vec<Route>,
+    pub routes: Vec<Route>,
     #[serde(default)]
     pub access: Option<AccessControl>
 }

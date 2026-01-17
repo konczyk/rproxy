@@ -1,5 +1,5 @@
 use clap::Parser;
-use rproxy::{config, connection};
+use rproxy::{config, connection, health};
 use std::sync::Arc;
 use std::{env, io};
 use tokio::net::TcpListener;
@@ -30,6 +30,15 @@ async fn main() -> io::Result<()>{
         .init();
 
     let tracker = TaskTracker::new();
+
+    config.routes.iter().for_each(|r| {
+        let active = r.active_backends.clone();
+        let backends = r.backends.clone();
+        let path = str::from_utf8(r.path.as_slice()).unwrap_or("").to_string();
+        tracker.spawn(async move {
+            let _ = health::check(path, backends, active).await;
+        });
+    });
 
     loop {
         tokio::select! {
