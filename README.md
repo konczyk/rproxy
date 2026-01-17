@@ -7,13 +7,17 @@ A minimal async HTTP reverse proxy using Tokio.
 `rproxy` listens for HTTP connections, matches requests by `Host` header and path prefix, and forwards traffic to a configured upstream using
 bidirectional TCP streaming.  
 
-In addition to routing, `rproxy` can optionally enforce access control and authorization, allowing the proxy to operate as a private reverse proxy when required.
+In addition to routing, `rproxy` can optionally enforce access control and authorization, allowing the proxy to operate as a private reverse proxy when required.  
+
+`rproxy` also supports multiple backends per route, with round-robin load balancing and continuous health checks to automatically avoid unhealthy upstreams.
 ## Features
 
 - Async, non-blocking I/O (Tokio)
 - Dynamic routing via configuration file (default: `config.toml`)
 - Supports **TOML** and **YAML** (`.yaml` / `.yml`) configs - examples in `data` directory
 - Routing by `Host` header + path prefix
+- Multiple backends per route with round-robin load balancing
+- Active health checks with automatic backend exclusion and recovery
 - Per-route upstream timeouts
 - Protection against stalled or unresponsive backends
 - Graceful shutdown with active connection tracking
