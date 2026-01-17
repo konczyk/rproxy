@@ -9,6 +9,7 @@ mod tests {
     use std::collections::{HashMap, HashSet};
     use std::net::IpAddr;
     use std::str::FromStr;
+    use std::sync::atomic::AtomicUsize;
     use std::time::Duration;
     use base64::Engine;
     use base64::prelude::BASE64_STANDARD;
@@ -51,8 +52,9 @@ mod tests {
         let routes = vec![Route {
             host: "localhost:8080".as_bytes().to_vec(),
             path: "/target".as_bytes().to_vec(),
-            addr: backend_addr.to_string(),
-            timeout: None
+            backends: vec![backend_addr.to_string()],
+            timeout: None,
+            counter: AtomicUsize::new(0)
         }];
         let mut client = connect(routes, None).await;
 
@@ -83,8 +85,9 @@ mod tests {
         let routes = vec![Route {
             host: "localhost:8080".as_bytes().to_vec(),
             path: "/target".as_bytes().to_vec(),
-            addr: backend_addr.to_string(),
-            timeout: None
+            backends: vec![backend_addr.to_string()],
+            timeout: None,
+            counter: AtomicUsize::new(0)
         }];
 
         let access = AccessControl {
@@ -123,8 +126,9 @@ mod tests {
         let routes = vec![Route {
             host: "localhost:8080".as_bytes().to_vec(),
             path: "/target".as_bytes().to_vec(),
-            addr: backend_addr.to_string(),
-            timeout: None
+            backends: vec![backend_addr.to_string()],
+            timeout: None,
+            counter: AtomicUsize::new(0)
         }];
 
         let encoded = BASE64_STANDARD.encode("admin:password");
@@ -247,8 +251,9 @@ mod tests {
         let routes = vec![Route {
             host: "localhost:54322".as_bytes().to_vec(),
             path: "/target".as_bytes().to_vec(),
-            addr: "localhost:54321".to_string(),
-            timeout: None
+            backends: vec!["localhost:54321".to_string()],
+            timeout: None,
+            counter: AtomicUsize::new(0)
         }];
         let mut client = connect(routes, None).await;
         client.write_all(b"GET /target HTTP/1.1\r\nHost: localhost:54322\r\n\r\n").await.unwrap();
@@ -277,8 +282,9 @@ mod tests {
         let routes = vec![Route {
             host: "localhost:8080".as_bytes().to_vec(),
             path: "/target".as_bytes().to_vec(),
-            addr: backend_addr.to_string(),
-            timeout: Some(100)
+            backends: vec![backend_addr.to_string()],
+            timeout: Some(100),
+            counter: AtomicUsize::new(0)
         }];
         let mut client = connect(routes, None).await;
 

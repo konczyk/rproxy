@@ -81,8 +81,13 @@ pub async fn handle_connection(mut stream: TcpStream, config: Arc<Config>) -> io
 
     let timeout = Duration::from_millis(route.timeout.unwrap_or(10_000));
 
+    let backend = match route.next_addr() {
+        Some(b) => b,
+        None => return Err(handle_error(&mut stream, BadGateway, "Failed to fetch next backend").await),
+    };
+
     let result = tokio::time::timeout(timeout, async {
-        let mut upstream = TcpStream::connect(&route.addr).await?;
+        let mut upstream = TcpStream::connect(&backend).await?;
         upstream.write_all(&headers[..end-2]).await?;
         upstream.write_all(format!("X-Request-ID: {}\r\n\r\n", request_id).as_bytes()).await?;
 

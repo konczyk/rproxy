@@ -5,7 +5,7 @@ listen = "localhost:8080"
 [[routes]]
 host = "localhost:8080"
 path = "/pl"
-addr = "192.168.124.185:80"
+backends = ["192.168.124.185:80"]
 timeout = 5000 # optional timeout in ms
 
 # Access control settings for strict security

@@ -3,6 +3,6 @@ listen = "localhost:12345"
 [[routes]]
 host = "localhost:12345"
 path = "/"
-addr = "localhost:12346"
+backends = ["localhost:12346"]
 
 [access]
