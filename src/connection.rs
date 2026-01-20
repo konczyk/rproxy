@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::http;
-use crate::http::StatusCode::{BadGateway, BadRequest, Forbidden, GatewayTimeout, NotFound, RequestTimeout, Unauthorized};
+use crate::http::StatusCode::*;
 use crate::http::{HeaderKey, StatusCode};
 use io::ErrorKind;
 use std::io;
@@ -81,33 +81,62 @@ pub async fn handle_connection(mut stream: TcpStream, config: Arc<Config>) -> io
 
     let timeout = Duration::from_millis(route.timeout.unwrap_or(10_000));
 
-    let backend = match route.next_addr().await {
-        Some(b) => b,
-        None => return Err(handle_error(&mut stream, BadGateway, "Failed to fetch next backend").await),
-    };
+    let mut last_error = Ok(());
+    for attempt in 1..=3 {
+        let backend = match route.next_addr().await {
+            Some(b) => b,
+            None => return Err(handle_error(&mut stream, BadGateway, "Failed to fetch next backend").await),
+        };
 
-    let result = tokio::time::timeout(timeout, async {
-        let mut upstream = TcpStream::connect(&backend).await?;
-        upstream.write_all(&headers[..end-2]).await?;
-        upstream.write_all(format!("X-Request-ID: {}\r\n\r\n", request_id).as_bytes()).await?;
+        let mut upstream = match tokio::time::timeout(Duration::from_secs(1), async { TcpStream::connect(&backend).await }).await.map_err(|e| io::Error::from(e)) {
+            Ok(Ok(s)) => s,
+            Ok(Err(_)) if attempt < 3 => {
+                warn!("Connection failed for {}, retrying...", backend);
+                continue;
+            },
+            Err(_) if attempt < 3  => {
+                warn!("Connection timed out for {}, retrying...", backend);
+                continue;
+            },
+            Ok(Err(e)) | Err(e) => {
+                last_error = Err({
+                    error!("Connection failed/timed out for {}, giving up", backend);
+                    handle_error(&mut stream, BadGateway, e.to_string()).await
+                });
+                break;
+            },
+        };
 
-        copy_bidirectional(&mut stream, &mut upstream).await
-    }).await;
+        let result = tokio::time::timeout(timeout, async {
+            upstream.write_all(&headers[..end - 2]).await?;
+            upstream.write_all(format!("X-Request-ID: {}\r\n\r\n", request_id).as_bytes()).await?;
 
-    match result {
-        Ok(Ok(_)) => {
-            Ok(())
-        },
-        Ok(Err(e)) => Err(
-            match e.kind() {
-                ErrorKind::ConnectionRefused | ErrorKind::AddrNotAvailable | ErrorKind::Other => handle_error(&mut stream, BadGateway, e.to_string()).await,
-                ErrorKind::TimedOut => handle_error(&mut stream, GatewayTimeout, e.to_string()).await,
-                _ => handle_error(&mut stream, BadRequest, e.to_string()).await
-            }
-        ),
-        Err(e) => Err({
-            error!("Connection to upstream timed out: {}", e);
-            handle_error(&mut stream, GatewayTimeout, e.to_string()).await
-        }),
+            Ok::<io::Result<()>, io::Error>(copy_bidirectional(&mut stream, &mut upstream).await.map(|_| ()))
+        }).await;
+
+        match &result {
+            Ok(Ok(Ok(_))) => return Ok(()),
+            Ok(Err(e)) if attempt < 3 => {
+                warn!("Attempt {} failed when connecting to {}: {}", attempt, &backend, e);
+                continue;
+            },
+            Ok(Err(e)) | Ok(Ok(Err(e))) => {
+                last_error = Err(match e.kind() {
+                    ErrorKind::ConnectionRefused | ErrorKind::AddrNotAvailable | ErrorKind::Other => handle_error(&mut stream, BadGateway, e.to_string()).await,
+                    ErrorKind::TimedOut => handle_error(&mut stream, GatewayTimeout, e.to_string()).await,
+                    _ => handle_error(&mut stream, BadRequest, e.to_string()).await
+                });
+                break;
+            },
+            Err(e) => {
+                last_error = Err({
+                    error!("Connection to upstream timed out: {}", e);
+                    handle_error(&mut stream, GatewayTimeout, e.to_string()).await
+                });
+                break;
+            },
+        }
     }
+    last_error
+
 }

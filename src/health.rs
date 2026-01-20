@@ -25,7 +25,7 @@ pub async fn check(path: String, backends: Vec<String>, active: Arc<RwLock<Vec<S
                 }
             } else {
                 *status = (*status - 1).max(-2);
-                if *status > -1 {
+                if *status > 0 {
                     healthy.push(backend.clone());
                 }
             }

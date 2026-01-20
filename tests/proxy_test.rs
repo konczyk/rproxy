@@ -9,7 +9,7 @@ mod tests {
     use std::collections::{HashMap, HashSet};
     use std::net::IpAddr;
     use std::str::FromStr;
-    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
     use base64::Engine;
     use base64::prelude::BASE64_STANDARD;
@@ -68,6 +68,50 @@ mod tests {
 
         assert!(response.contains("200 OK"));
         assert!(response.contains("Hello"));
+    }
+
+    #[tokio::test]
+    async fn test_200_on_successful_retry() {
+        let backend_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let backend_addr = backend_listener.local_addr().unwrap();
+
+        let counter = Arc::new(AtomicUsize::new(0));
+        let counter_clone = counter.clone();
+
+        tokio::spawn(async move {
+            while let Ok((mut stream, _)) = backend_listener.accept().await {
+                if counter_clone.fetch_add(1, Ordering::SeqCst) == 0 {
+                    drop(stream);
+                } else {
+                    let mut buf = [0u8; 1024];
+                    let _ = stream.read(&mut buf).await;
+                    let response = b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello";
+                    let _ = stream.write_all(response).await;
+                    break;
+                }
+            }
+        });
+
+        let routes = vec![Route {
+            host: "localhost:8080".as_bytes().to_vec(),
+            path: "/target".as_bytes().to_vec(),
+            backends: vec![backend_addr.to_string()],
+            active_backends: Arc::new(RwLock::new(vec![backend_addr.to_string()])),
+            timeout: None,
+            counter: AtomicUsize::new(0)
+        }];
+        let mut client = connect(routes, None).await;
+
+        client.write_all(b"GET /target HTTP/1.1\r\nHost: localhost:8080\r\n\r\n").await.unwrap();
+        client.shutdown().await.unwrap();
+
+        let mut response = String::new();
+        client.read_to_string(&mut response).await.unwrap();
+        println!("{:?}", response);
+
+        assert!(response.contains("200 OK"));
+        assert!(response.contains("Hello"));
+        assert_eq!(counter.load(Ordering::SeqCst), 2);
     }
 
     #[tokio::test]
@@ -251,7 +295,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_502_on_invalid_gateway() {
+    async fn test_502_on_bad_gateway() {
         let routes = vec![Route {
             host: "localhost:54322".as_bytes().to_vec(),
             path: "/target".as_bytes().to_vec(),
