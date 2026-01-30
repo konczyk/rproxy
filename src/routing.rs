@@ -1,6 +1,6 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc};
 use serde::Deserialize;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::RwLock;
 use tracing::{error, trace};
 
@@ -13,7 +13,7 @@ pub struct RouteConfig {
 }
 
 #[derive(Deserialize)]
-#[serde(from="RouteConfig")]
+#[serde(from = "RouteConfig")]
 pub struct Route {
     pub host: Vec<u8>,
     pub path: Vec<u8>,
@@ -22,25 +22,35 @@ pub struct Route {
     #[serde(skip)]
     pub counter: AtomicUsize,
     #[serde(skip)]
-    pub active_backends: Arc<RwLock<Vec<String>>>
+    pub active_backends: Arc<RwLock<Vec<String>>>,
 }
 
 impl Route {
     pub async fn next_addr(&self) -> Option<String> {
         if self.backends.len() == 0 {
-            error!("No backends configured for route: {}", str::from_utf8(self.path.as_slice()).unwrap_or(""));
-            return None
+            error!(
+                "No backends configured for route: {}",
+                str::from_utf8(self.path.as_slice()).unwrap_or("")
+            );
+            return None;
         }
 
         let active = self.active_backends.read().await;
         if active.len() == 0 {
-            error!("No active backends found for route: {}", str::from_utf8(self.path.as_slice()).unwrap_or(""));
-            return None
+            error!(
+                "No active backends found for route: {}",
+                str::from_utf8(self.path.as_slice()).unwrap_or("")
+            );
+            return None;
         }
 
         let idx = self.counter.fetch_add(1, Ordering::SeqCst) % active.len();
         let backend = &active[idx];
-        trace!("Selected backend {} from route {}", backend, str::from_utf8(self.path.as_slice()).unwrap_or(""));
+        trace!(
+            "Selected backend {} from route {}",
+            backend,
+            str::from_utf8(self.path.as_slice()).unwrap_or("")
+        );
         Some(backend.clone())
     }
 }

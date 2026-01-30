@@ -9,7 +9,10 @@ pub async fn check(path: String, backends: Vec<String>, active: Arc<RwLock<Vec<S
     let mut interval = tokio::time::interval(Duration::from_secs(1));
 
     let mut health_map = HashMap::from(
-        backends.iter().map(|b| (b.clone(), 3)).collect::<HashMap<String, isize>>()
+        backends
+            .iter()
+            .map(|b| (b.clone(), 3))
+            .collect::<HashMap<String, isize>>(),
     );
 
     loop {
@@ -18,7 +21,9 @@ pub async fn check(path: String, backends: Vec<String>, active: Arc<RwLock<Vec<S
         let mut healthy = Vec::with_capacity(backends.len());
         for backend in &backends {
             let status = health_map.get_mut(backend).unwrap();
-            if let Ok(Ok(_)) = tokio::time::timeout(Duration::from_secs(1), TcpStream::connect(backend)).await {
+            if let Ok(Ok(_)) =
+                tokio::time::timeout(Duration::from_secs(1), TcpStream::connect(backend)).await
+            {
                 *status = (*status + 1).min(3);
                 if *status > 0 {
                     healthy.push(backend.clone());
@@ -35,7 +40,11 @@ pub async fn check(path: String, backends: Vec<String>, active: Arc<RwLock<Vec<S
         if healthy.is_empty() {
             error!("All backends for route {} are DOWN!", path);
         } else if current.is_empty() && !healthy.is_empty() {
-            info!("Route {} has {} healthy backends again", path, healthy.len());
+            info!(
+                "Route {} has {} healthy backends again",
+                path,
+                healthy.len()
+            );
         } else {
             trace!("Route {} has {} healthy backends", path, healthy.len());
         }

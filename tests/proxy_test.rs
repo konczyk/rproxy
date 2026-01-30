@@ -5,14 +5,14 @@ use tokio::net::{TcpListener, TcpStream};
 
 mod tests {
     use super::*;
+    use base64::Engine;
+    use base64::prelude::BASE64_STANDARD;
     use rproxy::config::{AccessControl, Auth, Config};
     use std::collections::{HashMap, HashSet};
     use std::net::IpAddr;
     use std::str::FromStr;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
-    use base64::Engine;
-    use base64::prelude::BASE64_STANDARD;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::sync::RwLock;
     use tokio::time::sleep;
@@ -56,11 +56,14 @@ mod tests {
             backends: vec![backend_addr.to_string()],
             active_backends: Arc::new(RwLock::new(vec![backend_addr.to_string()])),
             timeout: None,
-            counter: AtomicUsize::new(0)
+            counter: AtomicUsize::new(0),
         }];
         let mut client = connect(routes, None).await;
 
-        client.write_all(b"GET /target HTTP/1.1\r\nHost: localhost:8080\r\n\r\n").await.unwrap();
+        client
+            .write_all(b"GET /target HTTP/1.1\r\nHost: localhost:8080\r\n\r\n")
+            .await
+            .unwrap();
         client.shutdown().await.unwrap();
 
         let mut response = String::new();
@@ -98,11 +101,14 @@ mod tests {
             backends: vec![backend_addr.to_string()],
             active_backends: Arc::new(RwLock::new(vec![backend_addr.to_string()])),
             timeout: None,
-            counter: AtomicUsize::new(0)
+            counter: AtomicUsize::new(0),
         }];
         let mut client = connect(routes, None).await;
 
-        client.write_all(b"GET /target HTTP/1.1\r\nHost: localhost:8080\r\n\r\n").await.unwrap();
+        client
+            .write_all(b"GET /target HTTP/1.1\r\nHost: localhost:8080\r\n\r\n")
+            .await
+            .unwrap();
         client.shutdown().await.unwrap();
 
         let mut response = String::new();
@@ -134,7 +140,7 @@ mod tests {
             backends: vec![backend_addr.to_string()],
             active_backends: Arc::new(RwLock::new(vec![backend_addr.to_string()])),
             timeout: None,
-            counter: AtomicUsize::new(0)
+            counter: AtomicUsize::new(0),
         }];
 
         let access = AccessControl {
@@ -146,7 +152,12 @@ mod tests {
         };
 
         let mut client = connect(routes, Some(access)).await;
-        client.write_all(b"GET /target HTTP/1.1\r\nHost: localhost:8080\r\nX-Api-Key: api_key1\r\n\r\n").await.unwrap();
+        client
+            .write_all(
+                b"GET /target HTTP/1.1\r\nHost: localhost:8080\r\nX-Api-Key: api_key1\r\n\r\n",
+            )
+            .await
+            .unwrap();
         client.shutdown().await.unwrap();
 
         let mut response = String::new();
@@ -176,14 +187,17 @@ mod tests {
             backends: vec![backend_addr.to_string()],
             active_backends: Arc::new(RwLock::new(vec![backend_addr.to_string()])),
             timeout: None,
-            counter: AtomicUsize::new(0)
+            counter: AtomicUsize::new(0),
         }];
 
         let encoded = BASE64_STANDARD.encode("admin:password");
         let access = AccessControl {
             whitelist: None,
             auth: Some(Auth {
-                users: Some(HashMap::from([("admin".to_string(), "password".to_string())])),
+                users: Some(HashMap::from([(
+                    "admin".to_string(),
+                    "password".to_string(),
+                )])),
                 api_keys: None,
             }),
         };
@@ -202,7 +216,10 @@ mod tests {
     #[tokio::test]
     async fn test_400_on_missing_headers_delimiter() {
         let mut client = connect(vec![], None).await;
-        client.write_all(b"GET /buba HTTP/1.1\r\nHost: localhost:8080\r\n").await.unwrap();
+        client
+            .write_all(b"GET /buba HTTP/1.1\r\nHost: localhost:8080\r\n")
+            .await
+            .unwrap();
         client.shutdown().await.unwrap();
 
         let mut response = String::new();
@@ -229,7 +246,10 @@ mod tests {
         let access = AccessControl {
             whitelist: None,
             auth: Some(Auth {
-                users: Some(HashMap::from([("admin".to_string(), "password".to_string())])),
+                users: Some(HashMap::from([(
+                    "admin".to_string(),
+                    "password".to_string(),
+                )])),
                 api_keys: None,
             }),
         };
@@ -255,7 +275,10 @@ mod tests {
             }),
         };
         let mut client = connect(vec![], Some(access)).await;
-        client.write_all(b"GET / HTTP/1.1\r\nHost: localhost:8080\r\nX-Api-Key: api_key2\r\n\r\n").await.unwrap();
+        client
+            .write_all(b"GET / HTTP/1.1\r\nHost: localhost:8080\r\nX-Api-Key: api_key2\r\n\r\n")
+            .await
+            .unwrap();
         client.shutdown().await.unwrap();
 
         let mut response = [0u8; 1024];
@@ -273,7 +296,10 @@ mod tests {
             auth: None,
         };
         let mut client = connect(vec![], Some(access)).await;
-        client.write_all(b"GET / HTTP/1.1\r\nHost: localhost:8080\r\n\r\n").await.unwrap();
+        client
+            .write_all(b"GET / HTTP/1.1\r\nHost: localhost:8080\r\n\r\n")
+            .await
+            .unwrap();
         client.shutdown().await.unwrap();
 
         let mut response = [0u8; 1024];
@@ -285,7 +311,10 @@ mod tests {
     #[tokio::test]
     async fn test_404_on_missing_route() {
         let mut client = connect(vec![], None).await;
-        client.write_all(b"GET /buba HTTP/1.1\r\nHost: localhost:8080\r\n\r\n").await.unwrap();
+        client
+            .write_all(b"GET /buba HTTP/1.1\r\nHost: localhost:8080\r\n\r\n")
+            .await
+            .unwrap();
         client.shutdown().await.unwrap();
 
         let mut response = String::new();
@@ -302,10 +331,13 @@ mod tests {
             backends: vec!["localhost:54321".to_string()],
             active_backends: Arc::new(RwLock::new(vec!["localhost:54321".to_string()])),
             timeout: None,
-            counter: AtomicUsize::new(0)
+            counter: AtomicUsize::new(0),
         }];
         let mut client = connect(routes, None).await;
-        client.write_all(b"GET /target HTTP/1.1\r\nHost: localhost:54322\r\n\r\n").await.unwrap();
+        client
+            .write_all(b"GET /target HTTP/1.1\r\nHost: localhost:54322\r\n\r\n")
+            .await
+            .unwrap();
         client.shutdown().await.unwrap();
 
         let mut response = String::new();
@@ -334,11 +366,14 @@ mod tests {
             backends: vec![backend_addr.to_string()],
             active_backends: Arc::new(RwLock::new(vec![backend_addr.to_string()])),
             timeout: Some(100),
-            counter: AtomicUsize::new(0)
+            counter: AtomicUsize::new(0),
         }];
         let mut client = connect(routes, None).await;
 
-        client.write_all(b"GET /target HTTP/1.1\r\nHost: localhost:8080\r\n\r\n").await.unwrap();
+        client
+            .write_all(b"GET /target HTTP/1.1\r\nHost: localhost:8080\r\n\r\n")
+            .await
+            .unwrap();
         client.shutdown().await.unwrap();
 
         let mut response = String::new();
@@ -346,5 +381,4 @@ mod tests {
 
         assert!(response.contains("504 Gateway Timeout"));
     }
-
 }

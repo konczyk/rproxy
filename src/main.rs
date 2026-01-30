@@ -8,7 +8,6 @@ use tracing::{error, info, warn};
 
 #[derive(Parser)]
 struct Args {
-
     /// Config file to load
     #[arg(short, long, default_value = "config.toml")]
     config: String,
@@ -19,15 +18,14 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> io::Result<()>{
+async fn main() -> io::Result<()> {
     let args = Args::parse();
     let config = Arc::new(config::Config::new(&args.config)?);
     let listener = TcpListener::bind(&config.listen).await?;
-    let filter = env::var("RUST_LOG").unwrap_or_else(|_| (if args.debug { "debug" } else { "info" }).to_string());
+    let filter = env::var("RUST_LOG")
+        .unwrap_or_else(|_| (if args.debug { "debug" } else { "info" }).to_string());
 
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .init();
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     let tracker = TaskTracker::new();
 

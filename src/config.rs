@@ -1,7 +1,7 @@
 use crate::http::{HeaderKey, Request};
 use crate::routing::Route;
-use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fs::read_to_string;
@@ -33,21 +33,37 @@ pub struct Config {
     pub listen: String,
     pub routes: Vec<Route>,
     #[serde(default)]
-    pub access: Option<AccessControl>
+    pub access: Option<AccessControl>,
 }
 
 impl Config {
     pub fn new(config: &String) -> io::Result<Self> {
-        match Path::new(&config).extension().map(|ext| ext.to_ascii_lowercase()) {
+        match Path::new(&config)
+            .extension()
+            .map(|ext| ext.to_ascii_lowercase())
+        {
             Some(ext) => {
-                let data = read_to_string(&config).map_err(|e| Error::new(InvalidData, format!("Failed to load config file {config}: {e}")))?;
+                let data = read_to_string(&config).map_err(|e| {
+                    Error::new(
+                        InvalidData,
+                        format!("Failed to load config file {config}: {e}"),
+                    )
+                })?;
                 match ext.to_ascii_lowercase().to_str() {
                     Some("toml") => toml::from_str(&data).map_err(|e| Error::new(InvalidData, e)),
-                    Some("yaml") | Some("yml") => serde_yaml::from_str(&data).map_err(|e| Error::new(InvalidData, e)),
-                    _ => Err(Error::new(InvalidData, format!("Unsupported config extension {:?}", ext))),
+                    Some("yaml") | Some("yml") => {
+                        serde_yaml::from_str(&data).map_err(|e| Error::new(InvalidData, e))
+                    }
+                    _ => Err(Error::new(
+                        InvalidData,
+                        format!("Unsupported config extension {:?}", ext),
+                    )),
                 }
-            },
-            _ => Err(Error::new(InvalidData, "Config extension missing [use .toml, .yaml or .yml"))
+            }
+            _ => Err(Error::new(
+                InvalidData,
+                "Config extension missing [use .toml, .yaml or .yml",
+            )),
         }
     }
 
@@ -56,49 +72,77 @@ impl Config {
     }
 
     pub fn permit_addr(&self, peer_addr: IpAddr) -> bool {
-        self.access.as_ref().map_or(true, |acc| acc.whitelist.as_ref().map_or(true, |ips| ips.contains(&peer_addr)))
+        self.access.as_ref().map_or(true, |acc| {
+            acc.whitelist
+                .as_ref()
+                .map_or(true, |ips| ips.contains(&peer_addr))
+        })
     }
 
     pub fn permit_api_key(&self, api_key: &[u8]) -> bool {
-        self.access.as_ref()
-            .map_or(true, |acc| acc.auth.as_ref()
-                .map_or(true, |auth| auth.api_keys.as_ref()
-                    .map_or(false, |keys| str::from_utf8(api_key).ok().map_or(false, |key| keys.contains(key)))))
+        self.access.as_ref().map_or(true, |acc| {
+            acc.auth.as_ref().map_or(true, |auth| {
+                auth.api_keys.as_ref().map_or(false, |keys| {
+                    str::from_utf8(api_key)
+                        .ok()
+                        .map_or(false, |key| keys.contains(key))
+                })
+            })
+        })
     }
 
     pub fn permit_user(&self, header: &[u8]) -> bool {
-        if let Some(users) = self.access.as_ref().and_then(|acc| acc.auth.as_ref().and_then(|auth| auth.users.as_ref())) {
-            return if header.len() > 5 && header.get(..5).map_or(false, |h| h.eq_ignore_ascii_case(b"Basic")) {
-                let header_value = match header.get(5..).map(|x| BASE64_STANDARD.decode(x.trim_ascii_start())) {
+        if let Some(users) = self
+            .access
+            .as_ref()
+            .and_then(|acc| acc.auth.as_ref().and_then(|auth| auth.users.as_ref()))
+        {
+            return if header.len() > 5
+                && header
+                    .get(..5)
+                    .map_or(false, |h| h.eq_ignore_ascii_case(b"Basic"))
+            {
+                let header_value = match header
+                    .get(5..)
+                    .map(|x| BASE64_STANDARD.decode(x.trim_ascii_start()))
+                {
                     Some(Ok(v)) => v,
                     _ => return false,
                 };
                 let mut split = header_value.splitn(2, |x| *x == b':');
                 let u = split.next().map(|user| str::from_utf8(user).ok()).flatten();
                 let p = split.next();
-                let result = u.is_some() && p.is_some() && u.and_then(|user| users.get(user)).map(|x| x.as_bytes()) == p;
+                let result = u.is_some()
+                    && p.is_some()
+                    && u.and_then(|user| users.get(user)).map(|x| x.as_bytes()) == p;
                 if !result {
                     warn!("Basic authentication failed for user {}", u.unwrap_or(""));
                 }
                 result
             } else {
                 false
-            }
+            };
         }
         true
     }
 
     pub fn select_upstream(&self, request: &Request) -> Option<&Route> {
         self.routes.iter().find(|r| {
-            request.headers.get(&HeaderKey("host".as_bytes())).map(|h| *h == r.host).unwrap_or(false) &&
-                request.path.starts_with(&r.path)
+            request
+                .headers
+                .get(&HeaderKey("host".as_bytes()))
+                .map(|h| *h == r.host)
+                .unwrap_or(false)
+                && request.path.starts_with(&r.path)
         })
     }
-    
-    pub fn is_proxy_private(&self) -> bool {
-        self.access.as_ref().and_then(|acc| acc.auth.as_ref()).is_some()
-    }
 
+    pub fn is_proxy_private(&self) -> bool {
+        self.access
+            .as_ref()
+            .and_then(|acc| acc.auth.as_ref())
+            .is_some()
+    }
 }
 
 #[cfg(test)]
@@ -110,17 +154,22 @@ mod tests {
         Config {
             listen: "".to_string(),
             routes: vec![],
-            access: Some(
-                AccessControl {
-                    whitelist: None,
-                    auth: Some(
-                        Auth {
-                            users: users.map(|u| [(u.0.to_string(), u.1.to_string())].into_iter().collect::<HashMap<String, String>>()),
-                            api_keys: api_keys.map(|key| [key].iter().map(|x| x.to_string()).collect::<HashSet<String>>()),
-                        }
-                    )
-                }
-            )
+            access: Some(AccessControl {
+                whitelist: None,
+                auth: Some(Auth {
+                    users: users.map(|u| {
+                        [(u.0.to_string(), u.1.to_string())]
+                            .into_iter()
+                            .collect::<HashMap<String, String>>()
+                    }),
+                    api_keys: api_keys.map(|key| {
+                        [key]
+                            .iter()
+                            .map(|x| x.to_string())
+                            .collect::<HashSet<String>>()
+                    }),
+                }),
+            }),
         }
     }
 
@@ -265,17 +314,13 @@ mod tests {
         let config = Config {
             listen: "".to_string(),
             routes: vec![],
-            access: Some(
-                AccessControl {
-                    whitelist: None,
-                    auth: Some(
-                        Auth {
-                            users: None,
-                            api_keys: Some(HashSet::new()),
-                        }
-                    )
-                }
-            )
+            access: Some(AccessControl {
+                whitelist: None,
+                auth: Some(Auth {
+                    users: None,
+                    api_keys: Some(HashSet::new()),
+                }),
+            }),
         };
 
         assert!(!config.permit_api_key(b"1234"));
@@ -342,5 +387,4 @@ mod tests {
 
         assert!(config.permit_addr(IpAddr::from(Ipv4Addr::new(127, 0, 0, 1))));
     }
-
 }

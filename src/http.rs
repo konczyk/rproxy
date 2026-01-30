@@ -10,14 +10,14 @@ pub enum HeadersParseError {
     #[error("Header Fields Too Large")]
     TooLarge,
     #[error("Bad Request")]
-    Invalid
+    Invalid,
 }
 
 impl HeadersParseError {
     pub fn to_status_code(&self) -> StatusCode {
         match self {
             HeadersParseError::TooLarge => StatusCode::HeadersTooLarge,
-            HeadersParseError::Invalid => StatusCode::BadRequest
+            HeadersParseError::Invalid => StatusCode::BadRequest,
         }
     }
 }
@@ -75,7 +75,7 @@ impl<'a> Hash for HeaderKey<'a> {
 pub struct Request<'a> {
     pub method: &'a [u8],
     pub path: &'a [u8],
-    pub headers: HashMap::<HeaderKey<'a>, &'a [u8]>,
+    pub headers: HashMap<HeaderKey<'a>, &'a [u8]>,
 }
 
 impl<'a> Request<'a> {
@@ -89,31 +89,45 @@ impl<'a> Request<'a> {
             method.and_then(|m| path.map(|p| (m, p)))
         }) {
             let mut headers = HashMap::new();
-            lines.skip_while(|x| x.is_empty()).take_while(|x| !x.is_empty()).for_each(|line| {
-                let mut h = line.splitn(2, |x| *x == b':').map(|x| x.trim_ascii()).into_iter();
-                let header = h.next();
-                let value = h.next();
-                match header.and_then(|h| value.map(|v| (h, v))) {
-                    Some((h, v)) => {
-                        headers.insert(HeaderKey(h), v);
-                    },
-                    None => {
-                        warn!("Failed parsing header: {:?}", line)
-                    },
-                }
-            });
+            lines
+                .skip_while(|x| x.is_empty())
+                .take_while(|x| !x.is_empty())
+                .for_each(|line| {
+                    let mut h = line
+                        .splitn(2, |x| *x == b':')
+                        .map(|x| x.trim_ascii())
+                        .into_iter();
+                    let header = h.next();
+                    let value = h.next();
+                    match header.and_then(|h| value.map(|v| (h, v))) {
+                        Some((h, v)) => {
+                            headers.insert(HeaderKey(h), v);
+                        }
+                        None => {
+                            warn!("Failed parsing header: {:?}", line)
+                        }
+                    }
+                });
 
-            return Some(Request { method, path, headers })
+            return Some(Request {
+                method,
+                path,
+                headers,
+            });
         }
 
         None
     }
 
     pub fn get_header(&self, header: &str) -> Option<&[u8]> {
-        self.headers.get(&HeaderKey(header.as_bytes())).map(|h| h.iter().as_slice())
+        self.headers
+            .get(&HeaderKey(header.as_bytes()))
+            .map(|h| h.iter().as_slice())
     }
 
-    pub async fn parse_headers(stream: &mut TcpStream) -> Result<(Vec<u8>, usize), HeadersParseError> {
+    pub async fn parse_headers(
+        stream: &mut TcpStream,
+    ) -> Result<(Vec<u8>, usize), HeadersParseError> {
         let mut buf = [0u8; 512];
         let mut headers = Vec::with_capacity(2048);
         debug!("Parsing request headers");
@@ -123,23 +137,27 @@ impl<'a> Request<'a> {
                 Ok(bytes) => {
                     if bytes == 0 {
                         warn!("Reading headers returned 0 bytes");
-                        return Err(HeadersParseError::Invalid)
+                        return Err(HeadersParseError::Invalid);
                     }
                     headers.extend_from_slice(&buf[..bytes]);
                     if headers.len() >= 64 * 1024 {
                         warn!("Requested headers too large: {}", headers.len());
                         return Err(HeadersParseError::TooLarge);
                     }
-                    match headers.windows(4).enumerate().find(|(_, val)| val == b"\r\n\r\n") {
+                    match headers
+                        .windows(4)
+                        .enumerate()
+                        .find(|(_, val)| val == b"\r\n\r\n")
+                    {
                         Some((i, _)) => {
                             return Ok((headers, i + 4));
-                        },
-                        _ => ()
+                        }
+                        _ => (),
                     }
-                },
+                }
                 Err(e) => {
                     error!("Failed to read headers: {}", e);
-                    return Err(HeadersParseError::Invalid)
+                    return Err(HeadersParseError::Invalid);
                 }
             }
         }
